@@ -1,56 +1,25 @@
 # cursus
 
-## orgai Meeting Protocol CLI (MVP+)
+## mtg: Meeting Command System
 
-This repository includes a local `orgai` CLI that implements a deterministic meeting protocol state machine.
+This repository provides a transactional meeting OS CLI with strict event sourcing semantics.
 
-### Run
-
-```bash
-python -m orgai.main
-```
-
-Dry run without git side effects:
+## Run
 
 ```bash
-python -m orgai.main --no-git
+python -m orgai.main session up "topic"
 ```
 
-Use a TOML config file (IaC style):
+## Layers
 
-```bash
-python -m orgai.main --config orgai.toml
-```
+- `session`: lifecycle commands (`ls`, `up`, `read`, `down`)
+- `event`: append-only event log (`write`, `read`)
+- `doc`: curated knowledge docs (`write`, `read`)
+- `exec`: side-effect log (`write`, `read`)
 
-### Core commands
+## Key guarantees
 
-- `/start <topic>`: starts a meeting, creates a meeting branch (unless `--no-git`), enters `RUNNING`.
-- `/end`: closes and finalizes minutes to `docs/minutes/YYYY-MM-DD-topic-orgai.md`.
-- `/focus <text>`: updates current focus.
-- `/park <text>`: adds to parking lot.
-- `/status`: prints meeting state.
-- `/decide <text>`, `/task <text>`, `/note <text>`: structured minute updates.
-
-### State machine
-
-`IDLE -> RUNNING -> CLOSING -> DONE`
-
-Session state is saved to `.orgai_session.json`.
-
-### TOML configuration
-
-`orgai.toml` lets you declaratively manage behavior such as end keywords and output colors.
-
-```toml
-[meeting]
-end_keywords = ["end", "done", "終了"]
-
-[color]
-# enabled = true # optional: force color on
-
-[color.rules]
-usage = "yellow_bold"
-status = "blue"
-success = "green"
-error = "red_bold"
-```
+- Sessions are atomic and non-resumable.
+- Events are immutable append-only records.
+- `session down` commits durable outputs (minutes + extracted docs/tasks).
+- `session up` always reconstructs context and prints visible retrieval logs.
