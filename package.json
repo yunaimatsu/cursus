@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "gb": "node --experimental-strip-types orgai/main.ts",
-    "mtg": "node --experimental-strip-types orgai/main.ts",
     "test": "node --experimental-strip-types --test orgai/llm/__tests__/*.test.ts",
     "postinstall": "node --experimental-strip-types scripts/postinstall.mjs"
   }

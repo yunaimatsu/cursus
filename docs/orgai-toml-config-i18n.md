@@ -7,7 +7,7 @@ This document explains `orgai.toml` from **high-level overview** to **detailed k
 ## 1) English
 
 ### 1.1 Quick overview
-`orgai.toml` controls how the `gb`/`mtg` CLI behaves:
+`orgai.toml` controls how the `gb` CLI behaves:
 - `[meeting]`: meeting flow constraints (e.g., allowed event types).
 - `[paths]`: where session/runtime/output files are written.
 - `[retrieval]`: how context files are searched and filtered.
