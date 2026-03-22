@@ -27,11 +27,10 @@ type Session = {
 
 const ANSI_RESET = '\x1b[0m';
 const ANSI_BOLD_CYAN = '\x1b[1;36m';
-const USE_COLOR = !('NO_COLOR' in process.env);
 
 function styledLabel(label: string): string {
   const upper = label.toUpperCase();
-  if (!USE_COLOR) return upper;
+  if (!process.stdout.isTTY) return upper;
   return `${ANSI_BOLD_CYAN}${upper}${ANSI_RESET}`;
 }
 
@@ -229,6 +228,7 @@ async function cmdSessionUp(topicFromArgs: string): Promise<number> {
   };
   saveSession(session);
   console.log(`Created session ${session.session_id}`);
+  console.log(renderField('topic', input));
   console.log('Context reconstruction complete; session active.');
   return 0;
 }
