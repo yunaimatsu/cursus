@@ -3,13 +3,23 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from pathlib import Path
 
 from .commands import ParsedCommand, parse_command
 from .config import OrgaiConfig, load_config
 from .git import commit_minutes, create_branch, current_branch, push_branch
 from .meeting import Meeting, MeetingState
 from .storage import load_session, save_session
+
+
+class Ansi:
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    CYAN = "\033[36m"
 
 
 class Ansi:
@@ -38,8 +48,7 @@ class OrgaiApp:
         self.meeting = load_session()
         self.git_enabled = git_enabled
         self.thread_drift_count = 0
-        self.config = config or OrgaiConfig()
-        self.enable_color = self._resolve_color_enabled()
+        self.enable_color = sys.stdout.isatty() and os.getenv("NO_COLOR") is None
 
     def run(self) -> None:
         mode = "git-enabled" if self.git_enabled else "git-disabled"
@@ -52,8 +61,7 @@ class OrgaiApp:
             try:
                 raw = input("> ").strip()
             except (KeyboardInterrupt, EOFError):
-                exit_style = self.config.color.rules.get("exit", "dim")
-                print(f"\n{self._paint_by_style('Exiting orgai.', exit_style)}")
+                print(f"\n{self._paint('Exiting orgai.', Ansi.DIM)}")
                 break
 
             if not raw:
@@ -239,27 +247,17 @@ class OrgaiApp:
 
     def _colorize(self, text: str) -> str:
         lowered = text.lower()
-        style_name = self.config.color.rules.get("default", "cyan")
         if lowered.startswith("usage:") or "no active meeting" in lowered or "unknown command" in lowered:
-            style_name = self.config.color.rules.get("usage", style_name)
-        elif "off-topic" in lowered or "refocus needed" in lowered:
-            style_name = self.config.color.rules.get("warning", style_name)
-        elif "state=" in lowered or lowered.startswith("state:"):
-            style_name = self.config.color.rules.get("status", style_name)
-        elif "finalized" in lowered or "started" in lowered or "added" in lowered or "updated" in lowered:
-            style_name = self.config.color.rules.get("success", style_name)
-        elif "failed" in lowered or "error" in lowered:
-            style_name = self.config.color.rules.get("error", style_name)
-        return self._paint_by_style(text, style_name)
-
-    def _paint_by_style(self, text: str, style_name: str) -> str:
-        color, bold = self.STYLE_TO_ANSI.get(style_name, self.STYLE_TO_ANSI["cyan"])
-        return self._paint(text, color, bold=bold)
-
-    def _resolve_color_enabled(self) -> bool:
-        if self.config.color.enabled is not None:
-            return self.config.color.enabled
-        return sys.stdout.isatty() and os.getenv("NO_COLOR") is None
+            return self._paint(text, Ansi.YELLOW, bold=True)
+        if "off-topic" in lowered or "refocus needed" in lowered:
+            return self._paint(text, Ansi.YELLOW)
+        if "state=" in lowered or lowered.startswith("state:"):
+            return self._paint(text, Ansi.BLUE)
+        if "finalized" in lowered or "started" in lowered or "added" in lowered or "updated" in lowered:
+            return self._paint(text, Ansi.GREEN)
+        if "failed" in lowered or "error" in lowered:
+            return self._paint(text, Ansi.RED, bold=True)
+        return self._paint(text, Ansi.CYAN)
 
 
 def classify_topic(topic: str, focus: str, text: str) -> str:
