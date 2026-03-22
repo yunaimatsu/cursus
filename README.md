@@ -7,6 +7,9 @@ This repository provides a transactional meeting OS CLI with strict event sourci
 ## Run
 
 ```bash
+./gb init
+# => creates .glassblock/config.toml
+
 ./gb ss up
 # => topic: <your topic>
 # (inline topic argument is not supported)
@@ -40,6 +43,18 @@ After this, you can run:
 ```bash
 gb ss up
 ```
+
+## Global install config
+
+If you install with npm globally (`npm install -g ...`), postinstall creates:
+
+- `~/.config/glassblock/config.toml`
+
+`gb` looks up config in this order:
+
+1. `.glassblock/config.toml` (repo local)
+2. `~/.config/glassblock/config.toml` (global)
+3. `orgai.toml` (legacy fallback)
 
 ## Layers
 

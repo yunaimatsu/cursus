@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, appendF
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import readline from 'node:readline';
-import { loadConfig } from './config.ts';
+import { GLASSBLOCK_CONFIG_FILE, GLASSBLOCK_DIR, LEGACY_CONFIG_PATH, loadConfig } from './config.ts';
+import { DEFAULT_CONFIG_TOML } from './default-config.ts';
 
 const CONFIG = loadConfig();
 const BASE_DIR = CONFIG.paths.baseDir;
@@ -464,8 +465,28 @@ function cmdExecRead(): number {
   return 0;
 }
 
+function cmdInit(): number {
+  const glassblockDirPath = path.join(process.cwd(), GLASSBLOCK_DIR);
+  const glassblockConfigPath = path.join(glassblockDirPath, GLASSBLOCK_CONFIG_FILE);
+  mkdirSync(glassblockDirPath, { recursive: true });
+
+  if (existsSync(glassblockConfigPath)) {
+    console.log(`Config already exists: ${glassblockConfigPath}`);
+    return 0;
+  }
+
+  const legacyConfigPath = path.join(process.cwd(), LEGACY_CONFIG_PATH);
+  const initialConfig = existsSync(legacyConfigPath) ? readFileSync(legacyConfigPath, 'utf-8') : DEFAULT_CONFIG_TOML;
+  writeFileSync(glassblockConfigPath, initialConfig, 'utf-8');
+  console.log(`Initialized ${glassblockConfigPath}`);
+  return 0;
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+  if (args[0] === 'init') {
+    process.exit(cmdInit());
+  }
   const doGit = args.includes('--git');
   const filtered = args.filter((arg) => arg !== '--git');
 

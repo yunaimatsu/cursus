@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { PathLike } from 'node:fs';
+import os from 'node:os';
 
 export interface OrgaiConfig {
   meeting: {
@@ -54,6 +55,11 @@ const DEFAULTS = {
   },
 };
 
+export const GLASSBLOCK_DIR = '.glassblock';
+export const GLASSBLOCK_CONFIG_FILE = 'config.toml';
+export const GLOBAL_CONFIG_DIR = path.join('.config', 'glassblock');
+export const LEGACY_CONFIG_PATH = 'orgai.toml';
+
 function parseLineValue(text: string, key: string, section?: string): string | null {
   const lines = text.split(/\r?\n/);
   const currentSection = section ?? '';
@@ -106,12 +112,25 @@ function parseTomlNumber(text: string, key: string, section?: string): number | 
   return parsed;
 }
 
-export function loadConfig(configPath: PathLike = 'orgai.toml'): OrgaiConfig {
-  if (!existsSync(configPath)) {
+function resolveConfigPath(configPath?: PathLike): PathLike {
+  if (configPath) return configPath;
+
+  const glassblockConfigPath = path.join(GLASSBLOCK_DIR, GLASSBLOCK_CONFIG_FILE);
+  if (existsSync(glassblockConfigPath)) return glassblockConfigPath;
+
+  const globalConfigPath = path.join(os.homedir(), GLOBAL_CONFIG_DIR, GLASSBLOCK_CONFIG_FILE);
+  if (existsSync(globalConfigPath)) return globalConfigPath;
+
+  return LEGACY_CONFIG_PATH;
+}
+
+export function loadConfig(configPath?: PathLike): OrgaiConfig {
+  const resolvedPath = resolveConfigPath(configPath);
+  if (!existsSync(resolvedPath)) {
     return buildConfig('');
   }
 
-  const payload = readFileSync(configPath, 'utf-8');
+  const payload = readFileSync(resolvedPath, 'utf-8');
   return buildConfig(payload);
 }
 
