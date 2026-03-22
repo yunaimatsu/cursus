@@ -192,6 +192,36 @@ function cmdSessionLs(): number {
   return 0;
 }
 
+function normalizeLayer(layer?: string): string {
+  const key = (layer ?? '').toLowerCase();
+  const map: Record<string, string> = {
+    session: 'session',
+    ss: 'session',
+    event: 'event',
+    ev: 'event',
+    doc: 'doc',
+    dc: 'doc',
+    exec: 'exec',
+    ex: 'exec',
+  };
+  return map[key] ?? key;
+}
+
+function normalizeAction(action?: string): string {
+  const key = (action ?? '').toLowerCase();
+  const map: Record<string, string> = {
+    ls: 'ls',
+    up: 'up',
+    read: 'read',
+    rd: 'read',
+    down: 'down',
+    dn: 'down',
+    write: 'write',
+    wr: 'write',
+  };
+  return map[key] ?? key;
+}
+
 async function readTopicPrompt(): Promise<string> {
   if (!process.stdin.isTTY) {
     return readFileSync(0, 'utf-8').trim();
@@ -370,7 +400,7 @@ function cmdSessionDown(doGit: boolean): number {
 function cmdEventWrite(eventType: string, text: string): number {
   const session = loadActiveSession();
   if (!session || session.status !== 'active') {
-    console.log('No active session. Run: mtg session up <topic>');
+    console.log('No active session. Run: cs ss up <topic>');
     return 1;
   }
   appendEvent(session.session_id, eventType, text);
@@ -433,7 +463,9 @@ async function main(): Promise<void> {
   const doGit = args.includes('--git');
   const filtered = args.filter((arg) => arg !== '--git');
 
-  const [layer, action, ...rest] = filtered;
+  const [rawLayer, rawAction, ...rest] = filtered;
+  const layer = normalizeLayer(rawLayer);
+  const action = normalizeAction(rawAction);
   const maybeTopicArg = rest.join(' ').trim().replace(/^topic\s*:\s*/i, '');
 
   if (layer === 'session' && action === 'ls') process.exit(cmdSessionLs());
@@ -450,7 +482,7 @@ async function main(): Promise<void> {
   if (layer === 'exec' && action === 'write') process.exit(cmdExecWrite(rest.join(' ')));
   if (layer === 'exec' && action === 'read') process.exit(cmdExecRead());
 
-  console.error('Usage: mtg [--git] <session|event|doc|exec> <action> [args...]');
+  console.error('Usage: cs [--git] <ss|ev|dc|ex> <action> [args...]');
   process.exit(1);
 }
 

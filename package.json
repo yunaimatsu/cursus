@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "cs": "node --experimental-strip-types orgai/main.ts",
     "mtg": "node --experimental-strip-types orgai/main.ts"
   }
 }
