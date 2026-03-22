@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, appendFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import readline from 'node:readline';
 
 const BASE_DIR = '.mtg';
 const SESSION_FILE = path.join(BASE_DIR, 'session.json');
@@ -23,6 +24,19 @@ type Session = {
   current_focus: string;
   retrieval_sources: Array<{ path: string; type: string; score: number }>;
 };
+
+const ANSI_RESET = '\x1b[0m';
+const ANSI_BOLD_CYAN = '\x1b[1;36m';
+
+function styledLabel(label: string): string {
+  const upper = label.toUpperCase();
+  if (!process.stdout.isTTY) return upper;
+  return `${ANSI_BOLD_CYAN}${upper}${ANSI_RESET}`;
+}
+
+function renderField(label: string, value: string): string {
+  return `${styledLabel(label)}: ${value}`;
+}
 
 function utcNow(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -178,9 +192,22 @@ function cmdSessionLs(): number {
   return 0;
 }
 
-function cmdSessionUp(): number {
-  process.stdout.write('topic: ');
-  const input = readFileSync(0, 'utf-8').trim();
+async function readTopicPrompt(): Promise<string> {
+  if (!process.stdin.isTTY) {
+    return readFileSync(0, 'utf-8').trim();
+  }
+
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise<string>((resolve) => {
+    rl.question(`${styledLabel('topic')}: `, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+async function cmdSessionUp(topicFromArgs: string): Promise<number> {
+  const input = topicFromArgs || (await readTopicPrompt());
   if (!input) {
     console.log('Topic is required to start a session.');
     return 1;
@@ -201,7 +228,7 @@ function cmdSessionUp(): number {
   };
   saveSession(session);
   console.log(`Created session ${session.session_id}`);
-  console.log(`Topic set: ${input}`);
+  console.log(renderField('topic', input));
   console.log('Context reconstruction complete; session active.');
   return 0;
 }
@@ -222,7 +249,17 @@ function summaryFromEvents(events: EventItem[]): string {
 function cmdSessionRead(): number {
   const session = loadActiveSession();
   if (!session) {
-    console.log('[STRUCTURED]\nsession_id:\ntopic:\nstatus: idle\nstartedAt:\ncurrent_focus:\nevent_count: 0\ndecision_count: 0\ntask_count: 0\n\n[SUMMARY]\nNo active session.');
+    console.log('[STRUCTURED]');
+    console.log(renderField('session_id', ''));
+    console.log(renderField('topic', ''));
+    console.log(renderField('status', 'idle'));
+    console.log(renderField('startedAt', ''));
+    console.log(renderField('current_focus', ''));
+    console.log(renderField('event_count', '0'));
+    console.log(renderField('decision_count', '0'));
+    console.log(renderField('task_count', '0'));
+    console.log('\n[SUMMARY]');
+    console.log('No active session.');
     return 0;
   }
 
@@ -231,14 +268,14 @@ function cmdSessionRead(): number {
   const taskCount = events.filter((event) => event.type === 'task').length;
 
   console.log('[STRUCTURED]');
-  console.log(`session_id: ${session.session_id}`);
-  console.log(`topic: ${session.topic}`);
-  console.log(`status: ${session.status}`);
-  console.log(`startedAt: ${session.started_at}`);
-  console.log(`current_focus: ${session.current_focus}`);
-  console.log(`event_count: ${events.length}`);
-  console.log(`decision_count: ${decisionCount}`);
-  console.log(`task_count: ${taskCount}`);
+  console.log(renderField('session_id', session.session_id));
+  console.log(renderField('topic', session.topic));
+  console.log(renderField('status', session.status));
+  console.log(renderField('startedAt', session.started_at));
+  console.log(renderField('current_focus', session.current_focus));
+  console.log(renderField('event_count', String(events.length)));
+  console.log(renderField('decision_count', String(decisionCount)));
+  console.log(renderField('task_count', String(taskCount)));
   console.log('\n[SUMMARY]');
   console.log(summaryFromEvents(events));
   return 0;
@@ -391,15 +428,16 @@ function cmdExecRead(): number {
   return 0;
 }
 
-function main(): void {
+async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const doGit = args.includes('--git');
   const filtered = args.filter((arg) => arg !== '--git');
 
   const [layer, action, ...rest] = filtered;
+  const maybeTopicArg = rest.join(' ').trim().replace(/^topic\s*:\s*/i, '');
 
   if (layer === 'session' && action === 'ls') process.exit(cmdSessionLs());
-  if (layer === 'session' && action === 'up') process.exit(cmdSessionUp());
+  if (layer === 'session' && action === 'up') process.exit(await cmdSessionUp(maybeTopicArg));
   if (layer === 'session' && action === 'read') process.exit(cmdSessionRead());
   if (layer === 'session' && action === 'down') process.exit(cmdSessionDown(doGit));
 
@@ -416,4 +454,4 @@ function main(): void {
   process.exit(1);
 }
 
-main();
+void main();
