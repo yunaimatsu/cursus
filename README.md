@@ -74,6 +74,46 @@ If you install with npm globally (`npm install -g ...`), postinstall creates:
 
 - Node.js 22+ (uses `--experimental-strip-types` to run TypeScript directly).
 
+## LLM Provider Layer
+
+The repository now includes a provider-agnostic LLM layer at `orgai/llm`.
+
+- First-class providers: OpenAI, Anthropic, Gemini
+- OpenAI-compatible providers: Groq, OpenRouter, xAI, Local endpoint
+- Extendable slots: Azure OpenAI and Vertex AI model catalogs
+
+### Provider config example (`.glassblock/config.toml`)
+
+```toml
+[providers.openai]
+api_key = "sk-..."
+
+[providers.anthropic]
+api_key = "sk-ant-..."
+
+[providers.gemini]
+api_key = "AIza..."
+
+[providers.local]
+base_url = "http://localhost:11434/v1"
+api_key = "dummy"
+
+[agents.coder]
+model = "gpt-5"
+reasoning_effort = "high"
+```
+
+Environment variables are also supported (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, etc.), and `LOCAL_ENDPOINT` automatically overrides the Local provider URL.
+
+### Internal flow (API key -> model -> provider)
+
+1. `loadConfig()` merges TOML + env and builds `llm.providers` and `llm.agents`.
+2. `setProviderDefaults()` injects `*_API_KEY` / cloud endpoints.
+3. `setDefaultModelForAgents()` selects default agent model by provider priority.
+4. `validateProviders()` disables providers without credentials (with cloud exceptions).
+5. `createAgentProvider()` resolves `agent -> model -> provider config` and calls `NewProvider(...)`.
+6. Provider adapters convert messages/tools and normalize finish reasons + usage.
+
 ## Configuration docs
 
 - Multilingual `orgai.toml` guide: `docs/orgai-toml-config-i18n.md`
