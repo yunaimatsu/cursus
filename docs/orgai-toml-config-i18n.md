@@ -7,7 +7,7 @@ This document explains `orgai.toml` from **high-level overview** to **detailed k
 ## 1) English
 
 ### 1.1 Quick overview
-`orgai.toml` controls how the `cs`/`mtg` CLI behaves:
+`orgai.toml` controls how the `gb`/`mtg` CLI behaves:
 - `[meeting]`: meeting flow constraints (e.g., allowed event types).
 - `[paths]`: where session/runtime/output files are written.
 - `[retrieval]`: how context files are searched and filtered.
@@ -18,7 +18,7 @@ If a key is omitted, built-in defaults are used.
 ### 1.2 Typical setup
 1. Keep only the values you want to customize.
 2. Delete optional keys safely; defaults apply.
-3. Restart CLI command (`cs ...`) and verify behavior.
+3. Restart CLI command (`gb ...`) and verify behavior.
 
 ### 1.3 Detailed keys
 - `[meeting]`
@@ -48,7 +48,7 @@ Les clés absentes utilisent les valeurs par défaut.
 ### 2.2 Utilisation recommandée
 1. Gardez seulement les clés à personnaliser.
 2. Supprimez les autres clés sans risque.
-3. Lancez `cs` pour valider le résultat.
+3. Lancez `gb` pour valider le résultat.
 
 ### 2.3 Détails
 - `allowed_event_types` contrôle les types permis pour `ev write`.
@@ -72,7 +72,7 @@ Si faltan claves, se aplican valores predeterminados.
 ### 3.2 Flujo recomendado
 1. Edita solo lo necesario.
 2. Deja el resto sin definir.
-3. Ejecuta `cs` y confirma resultados.
+3. Ejecuta `gb` y confirma resultados.
 
 ### 3.3 Claves importantes
 - `top_entries` / `top_inner_entries`: amplitud de búsqueda.
@@ -95,7 +95,7 @@ Si faltan claves, se aplican valores predeterminados.
 ### 4.2 推荐使用方式
 1. 只保留你要覆盖的键。
 2. 其余键可以省略。
-3. 重新运行 `cs` 验证效果。
+3. 重新运行 `gb` 验证效果。
 
 ### 4.3 关键项
 - `allowed_event_types`：`ev write` 可接受的事件类型。
@@ -118,7 +118,7 @@ Si faltan claves, se aplican valores predeterminados.
 ### 5.2 권장 절차
 1. 필요한 키만 수정
 2. 나머지는 생략
-3. `cs` 실행 후 동작 확인
+3. `gb` 실행 후 동작 확인
 
 ### 5.3 상세 포인트
 - `base_dir` 변경 시 세션/이벤트/exec 파일 위치가 함께 바뀝니다.
@@ -170,7 +170,7 @@ Si faltan claves, se aplican valores predeterminados.
 ### 7.2 طريقة العمل المقترحة
 1. عدّل المفاتيح التي تحتاجها فقط.
 2. اترك الباقي بدون تعريف.
-3. شغّل `cs` للتأكد من النتيجة.
+3. شغّل `gb` للتأكد من النتيجة.
 
 ### 7.3 نقاط تفصيلية
 - `excluded_dirs` و `excluded_extensions` لتقليل الضوضاء في الفحص.
@@ -192,7 +192,7 @@ Si faltan claves, se aplican valores predeterminados.
 ### 8.2 सुझाया गया तरीका
 1. केवल ज़रूरी कुंजियाँ बदलें।
 2. बाकी कुंजियाँ छोड़ दें।
-3. `cs` चलाकर सत्यापित करें।
+3. `gb` चलाकर सत्यापित करें।
 
 ### 8.3 मुख्य विवरण
 - `max_sources` अंतिम चुने गए स्रोतों की सीमा है।
