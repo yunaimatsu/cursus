@@ -54,7 +54,6 @@ If you install with npm globally (`npm install -g ...`), postinstall creates:
 
 1. `.glassblock/config.toml` (repo local)
 2. `~/.config/glassblock/config.toml` (global)
-3. `orgai.toml` (legacy fallback)
 
 ## Layers
 

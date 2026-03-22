@@ -58,7 +58,6 @@ const DEFAULTS = {
 export const GLASSBLOCK_DIR = '.glassblock';
 export const GLASSBLOCK_CONFIG_FILE = 'config.toml';
 export const GLOBAL_CONFIG_DIR = path.join('.config', 'glassblock');
-export const LEGACY_CONFIG_PATH = 'orgai.toml';
 
 function parseLineValue(text: string, key: string, section?: string): string | null {
   const lines = text.split(/\r?\n/);
@@ -121,7 +120,7 @@ function resolveConfigPath(configPath?: PathLike): PathLike {
   const globalConfigPath = path.join(os.homedir(), GLOBAL_CONFIG_DIR, GLASSBLOCK_CONFIG_FILE);
   if (existsSync(globalConfigPath)) return globalConfigPath;
 
-  return LEGACY_CONFIG_PATH;
+  return glassblockConfigPath;
 }
 
 export function loadConfig(configPath?: PathLike): OrgaiConfig {

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, appendF
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import readline from 'node:readline';
-import { GLASSBLOCK_CONFIG_FILE, GLASSBLOCK_DIR, LEGACY_CONFIG_PATH, loadConfig } from './config.ts';
+import { GLASSBLOCK_CONFIG_FILE, GLASSBLOCK_DIR, loadConfig } from './config.ts';
 import { DEFAULT_CONFIG_TOML } from './default-config.ts';
 
 const CONFIG = loadConfig();
@@ -475,9 +475,7 @@ function cmdInit(): number {
     return 0;
   }
 
-  const legacyConfigPath = path.join(process.cwd(), LEGACY_CONFIG_PATH);
-  const initialConfig = existsSync(legacyConfigPath) ? readFileSync(legacyConfigPath, 'utf-8') : DEFAULT_CONFIG_TOML;
-  writeFileSync(glassblockConfigPath, initialConfig, 'utf-8');
+  writeFileSync(glassblockConfigPath, DEFAULT_CONFIG_TOML, 'utf-8');
   console.log(`Initialized ${glassblockConfigPath}`);
   return 0;
 }
