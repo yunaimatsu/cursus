@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 
 from .commands import ParsedCommand, parse_command
 from .git import commit_minutes, create_branch, current_branch, push_branch
@@ -10,20 +12,36 @@ from .storage import load_session, save_session
 END_KEYWORDS = {"end", "done", "終了"}
 
 
+class Ansi:
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    CYAN = "\033[36m"
+
+
 class OrgaiApp:
     def __init__(self, git_enabled: bool = True) -> None:
         self.meeting = load_session()
         self.git_enabled = git_enabled
         self.thread_drift_count = 0
+        self.enable_color = sys.stdout.isatty() and os.getenv("NO_COLOR") is None
 
     def run(self) -> None:
         mode = "git-enabled" if self.git_enabled else "git-disabled"
-        print(f"orgai CLI ready ({mode}). Type /start <topic> to begin, /end to close, /status for state.")
+        print(
+            self._colorize(
+                f"orgai CLI ready ({mode}). Type /start <topic> to begin, /end to close, /status for state."
+            )
+        )
         while True:
             try:
                 raw = input("> ").strip()
             except (KeyboardInterrupt, EOFError):
-                print("\nExiting orgai.")
+                print(f"\n{self._paint('Exiting orgai.', Ansi.DIM)}")
                 break
 
             if not raw:
@@ -31,10 +49,10 @@ class OrgaiApp:
 
             cmd = parse_command(raw)
             if cmd:
-                print(self.handle_command(cmd))
+                print(self._colorize(self.handle_command(cmd)))
                 continue
 
-            print(self.handle_text(raw))
+            print(self._colorize(self.handle_text(raw)))
 
     def handle_command(self, cmd: ParsedCommand) -> str:
         handlers = {
@@ -200,6 +218,26 @@ class OrgaiApp:
         suggested_focus = f"Refocus needed: {latest_text[:80]}"
         self.meeting.minutes.set_focus(suggested_focus)
         self.thread_drift_count = 0
+
+    def _paint(self, text: str, color: str, *, bold: bool = False) -> str:
+        if not self.enable_color:
+            return text
+        prefix = f"{Ansi.BOLD}{color}" if bold else color
+        return f"{prefix}{text}{Ansi.RESET}"
+
+    def _colorize(self, text: str) -> str:
+        lowered = text.lower()
+        if lowered.startswith("usage:") or "no active meeting" in lowered or "unknown command" in lowered:
+            return self._paint(text, Ansi.YELLOW, bold=True)
+        if "off-topic" in lowered or "refocus needed" in lowered:
+            return self._paint(text, Ansi.YELLOW)
+        if "state=" in lowered or lowered.startswith("state:"):
+            return self._paint(text, Ansi.BLUE)
+        if "finalized" in lowered or "started" in lowered or "added" in lowered or "updated" in lowered:
+            return self._paint(text, Ansi.GREEN)
+        if "failed" in lowered or "error" in lowered:
+            return self._paint(text, Ansi.RED, bold=True)
+        return self._paint(text, Ansi.CYAN)
 
 
 def classify_topic(topic: str, focus: str, text: str) -> str:
