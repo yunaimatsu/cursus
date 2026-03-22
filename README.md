@@ -1,29 +1,29 @@
-# cursus
+# glassblock-cli
 
-## cs: Compact Session Command System
+## gb: Compact Session Command System
 
 This repository provides a transactional meeting OS CLI with strict event sourcing semantics.
 
 ## Run
 
 ```bash
-./cs ss up
+./gb ss up
 # => topic: <your topic>
 # (inline topic argument is not supported)
 ```
 
-## Expose `cs` on PATH
+## Expose `gb` on PATH
 
 ```bash
-chmod +x ./cs
+chmod +x ./gb
 mkdir -p ~/.local/bin
-ln -sf "$(pwd)/cs" ~/.local/bin/cs
+ln -sf "$(pwd)/gb" ~/.local/bin/gb
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
 ### PATH をシェルに永続化する
 
-ターミナルを開き直しても `cs` を使えるように、使っているシェルの設定ファイルにも追記します。
+ターミナルを開き直しても `gb` を使えるように、使っているシェルの設定ファイルにも追記します。
 
 ```bash
 # bash の場合
@@ -38,7 +38,7 @@ source ~/.zshrc
 After this, you can run:
 
 ```bash
-cs ss up
+gb ss up
 ```
 
 ## Layers

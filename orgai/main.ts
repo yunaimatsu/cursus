@@ -406,7 +406,7 @@ function cmdSessionDown(doGit: boolean): number {
 function cmdEventWrite(eventType: string, text: string): number {
   const session = loadActiveSession();
   if (!session || session.status !== 'active') {
-    console.log('No active session. Run: cs ss up <topic>');
+    console.log('No active session. Run: gb ss up <topic>');
     return 1;
   }
   appendEvent(session.session_id, eventType, text);
@@ -488,7 +488,7 @@ async function main(): Promise<void> {
   if (layer === 'exec' && action === 'write') process.exit(cmdExecWrite(rest.join(' ')));
   if (layer === 'exec' && action === 'read') process.exit(cmdExecRead());
 
-  console.error('Usage: cs [--git] <ss|ev|dc|ex> <action> [args...]');
+  console.error('Usage: gb [--git] <ss|ev|dc|ex> <action> [args...]');
   process.exit(1);
 }
 
