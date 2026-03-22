@@ -110,38 +110,104 @@ def tokenize(text: str) -> set[str]:
     return {p for p in parts if p}
 
 
-def retrieval_candidates(topic: str) -> list[dict[str, Any]]:
+def _run_tool(command: list[str], traces: list[str] | None = None, objective: str | None = None) -> tuple[bool, str]:
+    if traces is not None and objective:
+        rendered_command = ' '.join(command)
+        rendered_objective = 'root' if objective == '.' else objective
+        traces.append(f"Reading {rendered_objective}... (`{rendered_command}`)")
+    proc = subprocess.run(command, text=True, capture_output=True)
+    if proc.returncode == 0:
+        return True, proc.stdout
+    return False, proc.stderr or proc.stdout
+
+
+def _tool_ls(path: Path, traces: list[str] | None = None) -> list[Path]:
+    ok, out = _run_tool(['ls', '-1', str(path)], traces=traces, objective=str(path))
+    if not ok:
+        return []
+    entries: list[Path] = []
+    for line in out.splitlines():
+        name = line.strip()
+        if not name:
+            continue
+        candidate = path / name
+        if '.git' in candidate.parts or '.mtg' in candidate.parts:
+            continue
+        entries.append(candidate)
+    return entries
+
+
+def _tool_head(path: Path, lines: int = 40, traces: list[str] | None = None) -> str:
+    ok, out = _run_tool(['sed', '-n', f'1,{lines}p', str(path)], traces=traces, objective=str(path))
+    return out if ok else ''
+
+
+def _tool_cat(path: Path, traces: list[str] | None = None) -> str:
+    ok, out = _run_tool(['cat', str(path)], traces=traces, objective=str(path))
+    return out if ok else ''
+
+
+def _score_name(path: Path, topic_tokens: set[str]) -> float:
+    name_tokens = tokenize(str(path))
+    overlap = len(topic_tokens.intersection(name_tokens))
+    if overlap == 0:
+        return 0.0
+    return overlap / max(len(topic_tokens), 1)
+
+
+def retrieval_candidates(topic: str) -> tuple[list[dict[str, Any]], list[str]]:
     topic_tokens = tokenize(topic)
-    files = [
-        path
-        for path in Path('.').glob('**/*')
-        if path.is_file() and '.git' not in path.parts and '.mtg' not in path.parts
-    ]
+    traces: list[str] = []
+    root_entries = _tool_ls(Path('.'), traces=traces)
+    name_ranked = sorted(root_entries, key=lambda p: _score_name(p, topic_tokens), reverse=True)
+
+    shortlisted: list[Path] = []
+    for entry in name_ranked[:8]:
+        if entry.is_dir():
+            inner = _tool_ls(entry, traces=traces)
+            inner_ranked = sorted(inner, key=lambda p: _score_name(p, topic_tokens), reverse=True)
+            shortlisted.extend(path for path in inner_ranked[:8] if path.is_file())
+        elif entry.is_file():
+            shortlisted.append(entry)
+
+    # fallback to top-level files if topic words are sparse
+    if not shortlisted:
+        shortlisted = [entry for entry in root_entries if entry.is_file()]
+
     scored: list[dict[str, Any]] = []
-    for path in files:
+    for path in shortlisted:
         if path.suffix.lower() in {'.png', '.jpg', '.jpeg', '.gif', '.pdf', '.pyc'}:
             continue
-        text = path.read_text(encoding='utf-8', errors='ignore')[:20000]
-        if not text.strip():
+        preview = _tool_head(path, lines=40, traces=traces)
+        if not preview.strip():
             continue
-        content_tokens = tokenize(text)
+        preview_tokens = tokenize(preview)
+        preview_overlap = len(topic_tokens.intersection(preview_tokens))
+        if preview_overlap <= 0 and _score_name(path, topic_tokens) <= 0:
+            continue
+
+        full_text = _tool_cat(path, traces=traces)[:30000]
+        content_tokens = tokenize(full_text)
         overlap = len(topic_tokens.intersection(content_tokens))
         if overlap <= 0:
+            overlap = preview_overlap
+        if overlap <= 0:
             continue
+
         kind = 'code' if path.suffix in {'.py', '.ts', '.tsx', '.js', '.jsx', '.rs', '.go', '.java'} else 'doc'
         if 'decision' in str(path).lower():
             kind = 'decision'
-        # doc > event > code preference via bonus
         bonus = 0.15 if kind == 'doc' else 0.1 if kind == 'decision' else 0.0
         score = min(0.99, overlap / max(len(topic_tokens), 1) + bonus)
         scored.append({'path': str(path), 'type': kind, 'score': round(score, 2)})
+
     scored.sort(key=lambda item: (item['score'], 1 if item['type'] == 'doc' else 0), reverse=True)
     if not scored:
         fallbacks = [Path('README.md'), Path('orgai/main.py')]
         for fb in fallbacks:
             if fb.exists():
                 scored.append({'path': str(fb), 'type': 'doc' if fb.suffix == '.md' else 'code', 'score': 0.01})
-    return scored[:5]
+    return scored[:5], traces
 
 
 def cmd_session_ls() -> int:
@@ -161,7 +227,10 @@ def cmd_session_up() -> int:
 
     ensure_dirs()
     session_id = str(uuid4())
-    sources = retrieval_candidates(resolved_topic)
+    sources, traces = retrieval_candidates(resolved_topic)
+
+    for trace in traces:
+        print(trace)
 
     # Mandatory retrieval visibility before loading context.
     for item in sources:
