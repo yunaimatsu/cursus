@@ -153,10 +153,15 @@ def cmd_session_ls() -> int:
     return 0
 
 
-def cmd_session_up(topic: str) -> int:
+def cmd_session_up() -> int:
+    resolved_topic = input('topic: ').strip()
+    if not resolved_topic:
+        print('Topic is required to start a session.')
+        return 1
+
     ensure_dirs()
     session_id = str(uuid4())
-    sources = retrieval_candidates(topic)
+    sources = retrieval_candidates(resolved_topic)
 
     # Mandatory retrieval visibility before loading context.
     for item in sources:
@@ -164,15 +169,15 @@ def cmd_session_up(topic: str) -> int:
 
     session = Session(
         session_id=session_id,
-        topic=topic,
+        topic=resolved_topic,
         status='active',
         started_at=utc_now(),
-        current_focus=topic,
+        current_focus=resolved_topic,
         retrieval_sources=sources,
     )
     save_session(session)
     print(f'Created session {session_id}')
-    print(f'Topic set: {topic}')
+    print(f'Topic set: {resolved_topic}')
     print('Context reconstruction complete; session active.')
     return 0
 
@@ -386,8 +391,7 @@ def build_parser() -> argparse.ArgumentParser:
     session = sub.add_parser('session')
     session_sub = session.add_subparsers(dest='action', required=True)
     session_sub.add_parser('ls')
-    up = session_sub.add_parser('up')
-    up.add_argument('topic')
+    session_sub.add_parser('up')
     session_sub.add_parser('read')
     session_sub.add_parser('down')
 
@@ -422,7 +426,7 @@ def main() -> None:
     if args.layer == 'session' and args.action == 'ls':
         raise SystemExit(cmd_session_ls())
     if args.layer == 'session' and args.action == 'up':
-        raise SystemExit(cmd_session_up(args.topic))
+        raise SystemExit(cmd_session_up())
     if args.layer == 'session' and args.action == 'read':
         raise SystemExit(cmd_session_read())
     if args.layer == 'session' and args.action == 'down':

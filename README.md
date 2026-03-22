@@ -7,7 +7,24 @@ This repository provides a transactional meeting OS CLI with strict event sourci
 ## Run
 
 ```bash
-python -m orgai.main session up "topic"
+./mtg session up
+# => topic: <your topic>
+# (inline topic argument is not supported)
+```
+
+## Expose `mtg` on PATH
+
+```bash
+chmod +x ./mtg
+mkdir -p ~/.local/bin
+ln -sf "$(pwd)/mtg" ~/.local/bin/mtg
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+After this, you can run:
+
+```bash
+mtg session up
 ```
 
 ## Layers
