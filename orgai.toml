@@ -1,0 +1,18 @@
+[meeting]
+# Any plain input matching these keywords while RUNNING will be treated as /end.
+end_keywords = ["end", "done", "終了"]
+
+[color]
+# null/omitted: auto detect (TTY + NO_COLOR)
+# true: always colorize, false: never colorize
+# enabled = true
+
+[color.rules]
+# Available values: yellow_bold, yellow, blue, green, red_bold, cyan, dim
+usage = "yellow_bold"
+warning = "yellow"
+status = "blue"
+success = "green"
+error = "red_bold"
+default = "cyan"
+exit = "dim"

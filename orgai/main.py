@@ -1,29 +1,59 @@
 from __future__ import annotations
 
 import argparse
+import os
+import sys
+from pathlib import Path
 
 from .commands import ParsedCommand, parse_command
+from .config import OrgaiConfig, load_config
 from .git import commit_minutes, create_branch, current_branch, push_branch
 from .meeting import Meeting, MeetingState
 from .storage import load_session, save_session
 
-END_KEYWORDS = {"end", "done", "終了"}
+
+class Ansi:
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    BLUE = "\033[34m"
+    CYAN = "\033[36m"
 
 
 class OrgaiApp:
-    def __init__(self, git_enabled: bool = True) -> None:
+    STYLE_TO_ANSI = {
+        "yellow_bold": (Ansi.YELLOW, True),
+        "yellow": (Ansi.YELLOW, False),
+        "blue": (Ansi.BLUE, False),
+        "green": (Ansi.GREEN, False),
+        "red_bold": (Ansi.RED, True),
+        "cyan": (Ansi.CYAN, False),
+        "dim": (Ansi.DIM, False),
+    }
+
+    def __init__(self, git_enabled: bool = True, config: OrgaiConfig | None = None) -> None:
         self.meeting = load_session()
         self.git_enabled = git_enabled
         self.thread_drift_count = 0
+        self.config = config or OrgaiConfig()
+        self.enable_color = self._resolve_color_enabled()
 
     def run(self) -> None:
         mode = "git-enabled" if self.git_enabled else "git-disabled"
-        print(f"orgai CLI ready ({mode}). Type /start <topic> to begin, /end to close, /status for state.")
+        print(
+            self._colorize(
+                f"orgai CLI ready ({mode}). Type /start <topic> to begin, /end to close, /status for state."
+            )
+        )
         while True:
             try:
                 raw = input("> ").strip()
             except (KeyboardInterrupt, EOFError):
-                print("\nExiting orgai.")
+                exit_style = self.config.color.rules.get("exit", "dim")
+                print(f"\n{self._paint_by_style('Exiting orgai.', exit_style)}")
                 break
 
             if not raw:
@@ -31,10 +61,10 @@ class OrgaiApp:
 
             cmd = parse_command(raw)
             if cmd:
-                print(self.handle_command(cmd))
+                print(self._colorize(self.handle_command(cmd)))
                 continue
 
-            print(self.handle_text(raw))
+            print(self._colorize(self.handle_text(raw)))
 
     def handle_command(self, cmd: ParsedCommand) -> str:
         handlers = {
@@ -56,7 +86,7 @@ class OrgaiApp:
         if self.meeting is None or self.meeting.state == MeetingState.IDLE:
             return "No active meeting. Start one with /start <topic>."
 
-        if self.meeting.state == MeetingState.RUNNING and text.strip().lower() in END_KEYWORDS:
+        if self.meeting.state == MeetingState.RUNNING and text.strip().lower() in self.config.end_keywords:
             return self._cmd_end("")
 
         if self.meeting.state != MeetingState.RUNNING:
@@ -201,6 +231,36 @@ class OrgaiApp:
         self.meeting.minutes.set_focus(suggested_focus)
         self.thread_drift_count = 0
 
+    def _paint(self, text: str, color: str, *, bold: bool = False) -> str:
+        if not self.enable_color:
+            return text
+        prefix = f"{Ansi.BOLD}{color}" if bold else color
+        return f"{prefix}{text}{Ansi.RESET}"
+
+    def _colorize(self, text: str) -> str:
+        lowered = text.lower()
+        style_name = self.config.color.rules.get("default", "cyan")
+        if lowered.startswith("usage:") or "no active meeting" in lowered or "unknown command" in lowered:
+            style_name = self.config.color.rules.get("usage", style_name)
+        elif "off-topic" in lowered or "refocus needed" in lowered:
+            style_name = self.config.color.rules.get("warning", style_name)
+        elif "state=" in lowered or lowered.startswith("state:"):
+            style_name = self.config.color.rules.get("status", style_name)
+        elif "finalized" in lowered or "started" in lowered or "added" in lowered or "updated" in lowered:
+            style_name = self.config.color.rules.get("success", style_name)
+        elif "failed" in lowered or "error" in lowered:
+            style_name = self.config.color.rules.get("error", style_name)
+        return self._paint_by_style(text, style_name)
+
+    def _paint_by_style(self, text: str, style_name: str) -> str:
+        color, bold = self.STYLE_TO_ANSI.get(style_name, self.STYLE_TO_ANSI["cyan"])
+        return self._paint(text, color, bold=bold)
+
+    def _resolve_color_enabled(self) -> bool:
+        if self.config.color.enabled is not None:
+            return self.config.color.enabled
+        return sys.stdout.isatty() and os.getenv("NO_COLOR") is None
+
 
 def classify_topic(topic: str, focus: str, text: str) -> str:
     """Heuristic anti-drift classification: on-topic | derived | off-topic."""
@@ -223,12 +283,18 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Disable git branch/commit/push operations (useful for local dry runs).",
     )
+    parser.add_argument(
+        "--config",
+        default="orgai.toml",
+        help="Path to TOML configuration file (default: orgai.toml).",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    OrgaiApp(git_enabled=not args.no_git).run()
+    config = load_config(Path(args.config))
+    OrgaiApp(git_enabled=not args.no_git, config=config).run()
 
 
 if __name__ == "__main__":

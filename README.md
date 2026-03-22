@@ -16,6 +16,12 @@ Dry run without git side effects:
 python -m orgai.main --no-git
 ```
 
+Use a TOML config file (IaC style):
+
+```bash
+python -m orgai.main --config orgai.toml
+```
+
 ### Core commands
 
 - `/start <topic>`: starts a meeting, creates a meeting branch (unless `--no-git`), enters `RUNNING`.
@@ -30,3 +36,21 @@ python -m orgai.main --no-git
 `IDLE -> RUNNING -> CLOSING -> DONE`
 
 Session state is saved to `.orgai_session.json`.
+
+### TOML configuration
+
+`orgai.toml` lets you declaratively manage behavior such as end keywords and output colors.
+
+```toml
+[meeting]
+end_keywords = ["end", "done", "終了"]
+
+[color]
+# enabled = true # optional: force color on
+
+[color.rules]
+usage = "yellow_bold"
+status = "blue"
+success = "green"
+error = "red_bold"
+```
