@@ -1,6 +1,37 @@
 [meeting]
 # Any plain input matching these keywords while RUNNING will be treated as /end.
 end_keywords = ["end", "done", "終了"]
+# Event types that `ev write` can accept.
+allowed_event_types = ["note", "decision", "task", "parking"]
+
+[paths]
+# Runtime/session files
+base_dir = ".mtg"
+session_file = "session.json"
+event_dir = "events"
+exec_file = "exec.jsonl"
+
+# Output files
+minutes_dir = "docs/minutes"
+doc_file = "docs/knowledge/decisions.md"
+issue_file = "docs/issues/tasks.md"
+
+[retrieval]
+# Candidate discovery limits
+top_entries = 8
+top_inner_entries = 8
+max_sources = 5
+
+# File scanning limits
+preview_lines = 40
+max_content_chars = 30000
+
+# Ignore rules
+excluded_dirs = [".git", ".mtg"]
+excluded_extensions = [".png", ".jpg", ".jpeg", ".gif", ".pdf", ".pyc"]
+
+# Used when no relevant source is found
+fallback_files = ["README.md", "orgai/main.ts"]
 
 [color]
 # null/omitted: auto detect (TTY + NO_COLOR)

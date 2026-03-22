@@ -4,16 +4,16 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync, appendF
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import readline from 'node:readline';
+import { loadConfig } from './config.ts';
 
-const BASE_DIR = '.mtg';
-const SESSION_FILE = path.join(BASE_DIR, 'session.json');
-const EVENT_DIR = path.join(BASE_DIR, 'events');
-const DOC_FILE = path.join('docs', 'knowledge', 'decisions.md');
-const ISSUE_FILE = path.join('docs', 'issues', 'tasks.md');
-const EXEC_FILE = path.join(BASE_DIR, 'exec.jsonl');
-const MINUTES_DIR = path.join('docs', 'minutes');
-
-const ALLOWED_EVENT_TYPES = new Set(['note', 'decision', 'task', 'parking']);
+const CONFIG = loadConfig();
+const BASE_DIR = CONFIG.paths.baseDir;
+const SESSION_FILE = CONFIG.paths.sessionFile;
+const EVENT_DIR = CONFIG.paths.eventDir;
+const DOC_FILE = CONFIG.paths.docFile;
+const ISSUE_FILE = CONFIG.paths.issueFile;
+const EXEC_FILE = CONFIG.paths.execFile;
+const MINUTES_DIR = CONFIG.paths.minutesDir;
 
 type EventItem = { type: string; text: string; timestamp: string; sessionId: string };
 type Session = {
@@ -66,7 +66,7 @@ function sessionEventFile(sessionId: string): string {
 }
 
 function appendEvent(sessionId: string, eventType: string, text: string): EventItem {
-  if (!ALLOWED_EVENT_TYPES.has(eventType)) {
+  if (!CONFIG.meeting.allowedEventTypes.has(eventType.toLowerCase())) {
     throw new Error(`Unsupported event type: ${eventType}`);
   }
   const event: EventItem = { type: eventType, text, timestamp: utcNow(), sessionId };
@@ -105,7 +105,13 @@ function toolLs(targetPath: string, traces?: string[]): string[] {
   if (!ok) return [];
   return readdirSync(targetPath)
     .map((name) => path.join(targetPath, name))
-    .filter((candidate) => !candidate.split(path.sep).includes('.git') && !candidate.split(path.sep).includes('.mtg'));
+    .filter((candidate) => {
+      const parts = candidate.split(path.sep);
+      for (const excluded of CONFIG.retrieval.excludedDirs) {
+        if (parts.includes(excluded)) return false;
+      }
+      return true;
+    });
 }
 
 function toolHead(targetPath: string, lines = 40, traces?: string[]): string {
@@ -131,11 +137,11 @@ function retrievalCandidates(topic: string): [Array<{ path: string; type: string
   const nameRanked = [...rootEntries].sort((a, b) => scoreName(b, topicTokens) - scoreName(a, topicTokens));
 
   const shortlisted: string[] = [];
-  for (const entry of nameRanked.slice(0, 8)) {
+  for (const entry of nameRanked.slice(0, CONFIG.retrieval.topEntries)) {
     if (statSync(entry).isDirectory()) {
       const inner = toolLs(entry, traces);
       const innerRanked = [...inner].sort((a, b) => scoreName(b, topicTokens) - scoreName(a, topicTokens));
-      shortlisted.push(...innerRanked.slice(0, 8).filter((item) => statSync(item).isFile()));
+      shortlisted.push(...innerRanked.slice(0, CONFIG.retrieval.topInnerEntries).filter((item) => statSync(item).isFile()));
     } else {
       shortlisted.push(entry);
     }
@@ -148,16 +154,16 @@ function retrievalCandidates(topic: string): [Array<{ path: string; type: string
   const scored: Array<{ path: string; type: string; score: number }> = [];
   for (const entry of shortlisted) {
     const ext = path.extname(entry).toLowerCase();
-    if (['.png', '.jpg', '.jpeg', '.gif', '.pdf', '.pyc'].includes(ext)) continue;
+    if (CONFIG.retrieval.excludedExtensions.has(ext)) continue;
 
-    const preview = toolHead(entry, 40, traces);
+    const preview = toolHead(entry, CONFIG.retrieval.previewLines, traces);
     if (!preview.trim()) continue;
 
     const previewTokens = tokenize(preview);
     const previewOverlap = [...topicTokens].filter((token) => previewTokens.has(token)).length;
     if (previewOverlap <= 0 && scoreName(entry, topicTokens) <= 0) continue;
 
-    const fullText = toolCat(entry, traces).slice(0, 30000);
+    const fullText = toolCat(entry, traces).slice(0, CONFIG.retrieval.maxContentChars);
     const contentTokens = tokenize(fullText);
     let overlap = [...topicTokens].filter((token) => contentTokens.has(token)).length;
     if (overlap <= 0) overlap = previewOverlap;
@@ -173,13 +179,13 @@ function retrievalCandidates(topic: string): [Array<{ path: string; type: string
   scored.sort((a, b) => b.score - a.score || (b.type === 'doc' ? 1 : 0) - (a.type === 'doc' ? 1 : 0));
 
   if (scored.length === 0) {
-    for (const fallback of ['README.md', 'orgai/main.ts']) {
+    for (const fallback of CONFIG.retrieval.fallbackFiles) {
       if (existsSync(fallback)) {
         scored.push({ path: fallback, type: fallback.endsWith('.md') ? 'doc' : 'code', score: 0.01 });
       }
     }
   }
-  return [scored.slice(0, 5), traces];
+  return [scored.slice(0, CONFIG.retrieval.maxSources), traces];
 }
 
 function cmdSessionLs(): number {

@@ -1,70 +1,173 @@
-import { readFileSync, existsSync } from 'node:fs';
-import { PathLike } from 'node:fs';
-
-export const DEFAULT_END_KEYWORDS = new Set(['end', 'done', '終了']);
-export const DEFAULT_COLOR_RULES: Record<string, string> = {
-  usage: 'yellow_bold',
-  warning: 'yellow',
-  status: 'blue',
-  success: 'green',
-  error: 'red_bold',
-  default: 'cyan',
-  exit: 'dim',
-};
-
-export interface ColorConfig {
-  enabled: boolean | null;
-  rules: Record<string, string>;
-}
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import type { PathLike } from 'node:fs';
 
 export interface OrgaiConfig {
-  endKeywords: Set<string>;
-  color: ColorConfig;
+  meeting: {
+    endKeywords: Set<string>;
+    allowedEventTypes: Set<string>;
+  };
+  paths: {
+    baseDir: string;
+    sessionFile: string;
+    eventDir: string;
+    docFile: string;
+    issueFile: string;
+    execFile: string;
+    minutesDir: string;
+  };
+  retrieval: {
+    topEntries: number;
+    topInnerEntries: number;
+    previewLines: number;
+    maxContentChars: number;
+    maxSources: number;
+    excludedDirs: Set<string>;
+    excludedExtensions: Set<string>;
+    fallbackFiles: string[];
+  };
 }
 
-function parseTomlArray(text: string, key: string): string[] | null {
-  const line = text
-    .split(/\r?\n/)
-    .find((item) => item.trim().startsWith(`${key} = [`));
-  if (!line) return null;
-  const match = line.match(/\[(.*)\]/);
+const DEFAULTS = {
+  meeting: {
+    endKeywords: ['end', 'done', '終了'],
+    allowedEventTypes: ['note', 'decision', 'task', 'parking'],
+  },
+  paths: {
+    baseDir: '.mtg',
+    sessionFile: 'session.json',
+    eventDir: 'events',
+    docFile: path.join('docs', 'knowledge', 'decisions.md'),
+    issueFile: path.join('docs', 'issues', 'tasks.md'),
+    execFile: 'exec.jsonl',
+    minutesDir: path.join('docs', 'minutes'),
+  },
+  retrieval: {
+    topEntries: 8,
+    topInnerEntries: 8,
+    previewLines: 40,
+    maxContentChars: 30000,
+    maxSources: 5,
+    excludedDirs: ['.git', '.mtg'],
+    excludedExtensions: ['.png', '.jpg', '.jpeg', '.gif', '.pdf', '.pyc'],
+    fallbackFiles: ['README.md', 'orgai/main.ts'],
+  },
+};
+
+function parseLineValue(text: string, key: string, section?: string): string | null {
+  const lines = text.split(/\r?\n/);
+  const currentSection = section ?? '';
+  let activeSection = '';
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const sectionMatch = line.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch) {
+      activeSection = sectionMatch[1]?.trim() ?? '';
+      continue;
+    }
+
+    if (activeSection !== currentSection) continue;
+
+    if (!line.startsWith(`${key} = `)) continue;
+    return line.split('=').slice(1).join('=').trim();
+  }
+
+  return null;
+}
+
+function parseTomlString(text: string, key: string, section?: string): string | null {
+  const value = parseLineValue(text, key, section);
+  if (!value) return null;
+  const match = value.match(/^"(.*)"$/);
+  return match ? match[1] : null;
+}
+
+function parseTomlArray(text: string, key: string, section?: string): string[] | null {
+  const value = parseLineValue(text, key, section);
+  if (!value) return null;
+  const match = value.match(/^\[(.*)\]$/);
   if (!match) return null;
-  return match[1]
+  const body = match[1]?.trim() ?? '';
+  if (!body) return [];
+  return body
     .split(',')
     .map((v) => v.trim().replace(/^"|"$/g, ''))
     .filter(Boolean);
 }
 
-function parseTomlBoolean(text: string, key: string): boolean | null {
-  const line = text
-    .split(/\r?\n/)
-    .find((item) => item.trim().startsWith(`${key} = `));
-  if (!line) return null;
-  const value = line.split('=').slice(1).join('=').trim().toLowerCase();
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  return null;
+function parseTomlNumber(text: string, key: string, section?: string): number | null {
+  const value = parseLineValue(text, key, section);
+  if (!value) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
 }
 
-export function loadConfig(path: PathLike = 'orgai.toml'): OrgaiConfig {
-  if (!existsSync(path)) {
-    return {
-      endKeywords: new Set(DEFAULT_END_KEYWORDS),
-      color: { enabled: null, rules: { ...DEFAULT_COLOR_RULES } },
-    };
+export function loadConfig(configPath: PathLike = 'orgai.toml'): OrgaiConfig {
+  if (!existsSync(configPath)) {
+    return buildConfig('');
   }
 
-  const payload = readFileSync(path, 'utf-8');
-  const keywords = parseTomlArray(payload, 'end_keywords');
-  const enabled = parseTomlBoolean(payload, 'enabled');
+  const payload = readFileSync(configPath, 'utf-8');
+  return buildConfig(payload);
+}
+
+function buildConfig(payload: string): OrgaiConfig {
+  const baseDir = parseTomlString(payload, 'base_dir', 'paths') ?? DEFAULTS.paths.baseDir;
+  const sessionFileName = parseTomlString(payload, 'session_file', 'paths') ?? DEFAULTS.paths.sessionFile;
+  const eventDirName = parseTomlString(payload, 'event_dir', 'paths') ?? DEFAULTS.paths.eventDir;
+  const execFileName = parseTomlString(payload, 'exec_file', 'paths') ?? DEFAULTS.paths.execFile;
+
+  const endKeywords =
+    parseTomlArray(payload, 'end_keywords', 'meeting') ??
+    parseTomlArray(payload, 'end_keywords') ??
+    DEFAULTS.meeting.endKeywords;
+
+  const allowedEventTypes =
+    parseTomlArray(payload, 'allowed_event_types', 'meeting') ?? DEFAULTS.meeting.allowedEventTypes;
+
+  const topEntries = parseTomlNumber(payload, 'top_entries', 'retrieval') ?? DEFAULTS.retrieval.topEntries;
+  const topInnerEntries =
+    parseTomlNumber(payload, 'top_inner_entries', 'retrieval') ?? DEFAULTS.retrieval.topInnerEntries;
+  const previewLines = parseTomlNumber(payload, 'preview_lines', 'retrieval') ?? DEFAULTS.retrieval.previewLines;
+  const maxContentChars =
+    parseTomlNumber(payload, 'max_content_chars', 'retrieval') ?? DEFAULTS.retrieval.maxContentChars;
+  const maxSources = parseTomlNumber(payload, 'max_sources', 'retrieval') ?? DEFAULTS.retrieval.maxSources;
+
+  const excludedDirs =
+    parseTomlArray(payload, 'excluded_dirs', 'retrieval') ??
+    DEFAULTS.retrieval.excludedDirs.map((dir) => (dir === '.mtg' ? baseDir : dir));
 
   return {
-    endKeywords: keywords
-      ? new Set(keywords.map((v) => v.trim().toLowerCase()).filter(Boolean))
-      : new Set(DEFAULT_END_KEYWORDS),
-    color: {
-      enabled,
-      rules: { ...DEFAULT_COLOR_RULES },
+    meeting: {
+      endKeywords: new Set(endKeywords.map((value) => value.trim().toLowerCase()).filter(Boolean)),
+      allowedEventTypes: new Set(allowedEventTypes.map((value) => value.trim().toLowerCase()).filter(Boolean)),
+    },
+    paths: {
+      baseDir,
+      sessionFile: path.join(baseDir, sessionFileName),
+      eventDir: path.join(baseDir, eventDirName),
+      docFile: parseTomlString(payload, 'doc_file', 'paths') ?? DEFAULTS.paths.docFile,
+      issueFile: parseTomlString(payload, 'issue_file', 'paths') ?? DEFAULTS.paths.issueFile,
+      execFile: path.join(baseDir, execFileName),
+      minutesDir: parseTomlString(payload, 'minutes_dir', 'paths') ?? DEFAULTS.paths.minutesDir,
+    },
+    retrieval: {
+      topEntries: Math.max(1, Math.floor(topEntries)),
+      topInnerEntries: Math.max(1, Math.floor(topInnerEntries)),
+      previewLines: Math.max(1, Math.floor(previewLines)),
+      maxContentChars: Math.max(1000, Math.floor(maxContentChars)),
+      maxSources: Math.max(1, Math.floor(maxSources)),
+      excludedDirs: new Set(excludedDirs),
+      excludedExtensions: new Set(
+        (parseTomlArray(payload, 'excluded_extensions', 'retrieval') ?? DEFAULTS.retrieval.excludedExtensions).map((ext) =>
+          ext.toLowerCase(),
+        ),
+      ),
+      fallbackFiles: parseTomlArray(payload, 'fallback_files', 'retrieval') ?? DEFAULTS.retrieval.fallbackFiles,
     },
   };
 }

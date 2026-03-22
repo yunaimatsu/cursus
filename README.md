@@ -59,3 +59,7 @@ cs ss up
 ## Runtime
 
 - Node.js 22+ (uses `--experimental-strip-types` to run TypeScript directly).
+
+## Configuration docs
+
+- Multilingual `orgai.toml` guide: `docs/orgai-toml-config-i18n.md`
