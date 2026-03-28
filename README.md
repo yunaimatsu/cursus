@@ -117,3 +117,30 @@ Environment variables are also supported (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
 ## Configuration docs
 
 - Multilingual `orgai.toml` guide: `docs/orgai-toml-config-i18n.md`
+
+## Minimal Codex-style board (`gb board`)
+
+A keyboard-first board is available in the terminal:
+
+```bash
+gb board
+```
+
+### Layout
+
+- Top: `prompt board` (draft task prompt)
+- Bottom: `task board` (queued/running tasks)
+- Optional bottom panel: `task detail panel`
+
+### Keys
+
+- `Enter`: queue prompt as a new task (and create `task/<timestamp>-<slug>` branch)
+- `n`: newline in prompt editor
+- `j` / `k`: move focus in task board
+- `Enter` (on task board with empty prompt): toggle detail panel
+- `i`: enter instruction mode in detail panel
+- `Enter` (instruction mode): append instruction to focused task
+- `s`: cycle status (`working -> waiting you -> PR made -> merged`)
+- `q` or `Ctrl+C`: quit
+
+`gb board` persists tasks to `.mtg/board/tasks.json`.
