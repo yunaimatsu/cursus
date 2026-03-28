@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import readline from 'node:readline';
 import { GLASSBLOCK_CONFIG_FILE, GLASSBLOCK_DIR, loadConfig } from './config.ts';
 import { DEFAULT_CONFIG_TOML } from './default-config.ts';
+import { runBoard } from './board.ts';
 
 const CONFIG = loadConfig();
 const BASE_DIR = CONFIG.paths.baseDir;
@@ -485,6 +486,9 @@ async function main(): Promise<void> {
   if (args[0] === 'init') {
     process.exit(cmdInit());
   }
+  if (args[0] === 'board') {
+    process.exit(await runBoard());
+  }
   const doGit = args.includes('--git');
   const filtered = args.filter((arg) => arg !== '--git');
 
@@ -507,7 +511,7 @@ async function main(): Promise<void> {
   if (layer === 'exec' && action === 'write') process.exit(cmdExecWrite(rest.join(' ')));
   if (layer === 'exec' && action === 'read') process.exit(cmdExecRead());
 
-  console.error('Usage: gb [--git] <ss|ev|dc|ex> <action> [args...]');
+  console.error('Usage: gb init | gb board | gb [--git] <ss|ev|dc|ex> <action> [args...]');
   process.exit(1);
 }
 
